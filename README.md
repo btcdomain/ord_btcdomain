@@ -1,3 +1,10 @@
+## This is a special version for supporting btcdomain resolver. Compared with the casey's, we add following functions:
+
+1.find inscriptions by num
+
+2.find owner address by inscriptions
+
+
 `ord`
 =====
 
