@@ -4,6 +4,8 @@
 
 2.find owner address by inscriptions
 
+You could see the usage method on --help
+
 
 `ord`
 =====
