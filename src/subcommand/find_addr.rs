@@ -1,28 +1,24 @@
 use super::*;
 
 #[derive(Debug, Parser)]
-pub(crate) struct FindById {
+pub(crate) struct FindAddr {
   #[clap(help = "Find inscribe by id.")]
   id: String,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Output {
-  pub content: Vec<u8>,
-  pub content_type: String,
-  pub inscribe_num: u64,
   pub output_address: String,
   pub input_address: String
 }
 
-impl FindById {
+impl FindAddr {
   pub(crate) fn run(self, options: Options) -> Result {
     let index = Index::open(&options)?;
 
     index.update()?;
 
     let inscription_id = self.id.parse::<InscriptionId>().unwrap();
-    let entry = index.get_inscription_entry(inscription_id).unwrap();
 
     let satpoint = index
       .get_inscription_satpoint_by_id(inscription_id)
@@ -33,21 +29,13 @@ impl FindById {
     let output_address = get_address_from_tx(satpoint.outpoint, &index);
     let input_address = get_address_from_tx(tx.input[0].previous_output, &index);
 
-    let content = index.get_inscription_by_id(inscription_id).unwrap();
-    if content.is_some() {
-      let content_value = content.unwrap();
-      print_json(Output {
-        content: content_value.clone().into_body().unwrap(),
-        content_type: (&content_value.content_type().unwrap()).to_string(),
-        inscribe_num: entry.unwrap().number,
-        output_address,
-        input_address
-      })
-      .unwrap();
-      Ok(())
-    } else {
-      Err(anyhow!("query inscribe by id failed"))
-    }
+    print_json(Output {
+      output_address,
+      input_address
+    })
+    .unwrap();
+    Ok(())
+    
   }
 }
 

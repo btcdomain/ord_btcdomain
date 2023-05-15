@@ -1,9 +1,12 @@
+use serde_json::json;
+
 use {
   self::{
     deserialize_from_str::DeserializeFromStr,
     error::{OptionExt, ServerError, ServerResult},
   },
   super::*,
+  crate::api::*,
   crate::page_config::PageConfig,
   crate::templates::{
     BlockHtml, ClockSvg, HomeHtml, InputHtml, InscriptionHtml, InscriptionsHtml, OutputHtml,
@@ -168,6 +171,11 @@ impl Server {
         .route("/static/*path", get(Self::static_asset))
         .route("/status", get(Self::status))
         .route("/tx/:txid", get(Self::transaction))
+        .route("/api/inscription/:inscription_id", get(Self::api_inscription_id))
+        .route("/api/inscription_number/:number", get(Self::api_inscription_num))
+        .route("/api/inscription_all/:number", get(Self::api_inscription_all))
+        .route("/api/inscription_total", get(Self::api_inscription_total))
+        .route("/api/first_owner/:inscription_id", get(Self::api_first_owner))
         .layer(Extension(index))
         .layer(Extension(page_config))
         .layer(Extension(Arc::new(config)))
@@ -353,6 +361,141 @@ impl Server {
 
   fn index_height(index: &Index) -> ServerResult<Height> {
     index.height()?.ok_or_not_found(|| "genesis block")
+  }
+
+  async fn api_inscription_num(Extension(index): Extension<Arc<Index>>, Path(number): Path<u64>) -> ServerResult<Response> {
+    let output = index
+      .get_inscription_id_by_inscription_number(number)
+      .unwrap();
+    let inscription_id = output.unwrap();
+    let entry = index.get_inscription_entry(inscription_id).unwrap().unwrap();
+    let satpoint = index
+      .get_inscription_satpoint_by_id(inscription_id)
+      .unwrap()
+      .unwrap();
+    let content = index.get_inscription_by_id(inscription_id).unwrap().unwrap();
+
+    let output = index
+      .get_transaction(satpoint.outpoint.txid)?
+      .ok_or_not_found(|| format!("inscription {inscription_id} current transaction"))?
+      .output
+      .into_iter()
+      .nth(satpoint.outpoint.vout.try_into().unwrap())
+      .map(|tx_out| {
+        Address::from_script(&tx_out.script_pubkey, Network::Bitcoin).unwrap().to_string()
+    });
+    let content = content.into_body().unwrap();
+    let timestamp = entry.timestamp;
+    let data = json!(InscribeContent{
+      content,
+      inscribe_id: inscription_id.to_string(),
+      inscribe_num: number,
+      timestamp,
+      address: output.unwrap()
+    });
+    Ok(serde_json::to_vec(&data).unwrap().into_response())
+  }
+
+
+  async fn api_inscription_all(Extension(index): Extension<Arc<Index>>, Path(number): Path<u64>) -> ServerResult<Response> {
+    let output = index
+      .get_inscription_id_by_inscription_number(number)
+      .unwrap();
+    let inscription_id = output.unwrap();
+    let entry = index.get_inscription_entry(inscription_id).unwrap().unwrap();
+    let satpoint = index
+      .get_inscription_satpoint_by_id(inscription_id)
+      .unwrap()
+      .unwrap();
+    let content_data = index.get_inscription_by_id(inscription_id).unwrap().unwrap();
+    let tx = index.get_transaction(satpoint.outpoint.txid).unwrap().unwrap();
+
+    let output_address = tx
+      .output
+      .into_iter()
+      .nth(satpoint.outpoint.vout.try_into().unwrap())
+      .map(|tx_out| {
+        Address::from_script(&tx_out.script_pubkey, Network::Bitcoin).unwrap().to_string()
+    });
+
+    let pre_satpoint = tx.input[0].previous_output;
+    let pre_tx = index.get_transaction(pre_satpoint.txid).unwrap().unwrap();
+    let input_address = pre_tx
+      .output
+      .into_iter()
+      .nth(pre_satpoint.vout.try_into().unwrap())
+      .map(|tx_out| {
+        Address::from_script(&tx_out.script_pubkey, Network::Bitcoin).unwrap().to_string()
+    });
+
+    let content = content_data.clone().into_body().unwrap();
+    let timestamp = entry.timestamp;
+    let data = json!(InscribeBrc20Content{
+      content,
+      content_type: (&content_data.content_type().unwrap()).to_string(),
+      inscribe_id: inscription_id.to_string(),
+      inscribe_num: number,
+      timestamp,
+      output_address: output_address.unwrap(),
+      input_address: input_address.unwrap()
+    });
+    Ok(serde_json::to_vec(&data).unwrap().into_response())
+  }
+
+  async fn api_inscription_total(Extension(index): Extension<Arc<Index>>) -> ServerResult<Response> {
+    let query = index.get_inscriptions(None);
+    let total_size = query.unwrap().len();
+    let data = InscriptionTotal {
+      total: total_size
+    };
+    Ok(serde_json::to_vec(&data).unwrap().into_response())
+  }
+
+  async fn api_first_owner(Extension(index): Extension<Arc<Index>>, Path(inscription_id): Path<InscriptionId>) -> ServerResult<Response> {
+    let tx = index.get_transaction(inscription_id.txid).unwrap().unwrap();
+
+    let output_address = tx
+      .output
+      .into_iter()
+      .nth(inscription_id.index.try_into().unwrap())
+      .map(|tx_out| {
+        Address::from_script(&tx_out.script_pubkey, Network::Bitcoin).unwrap().to_string()
+    });
+    Ok(serde_json::to_vec(&InscriptionFirstOwner{
+      first_owner: output_address.unwrap()
+    }).unwrap().into_response())
+  }
+
+  async fn api_inscription_id(Extension(index): Extension<Arc<Index>>, Path(inscription_id): Path<InscriptionId>) -> ServerResult<Response> {
+    
+    let entry = index.get_inscription_entry(inscription_id).unwrap().unwrap();
+    let satpoint = index
+      .get_inscription_satpoint_by_id(inscription_id)
+      .unwrap()
+      .unwrap();
+    
+    
+    let content_data = index.get_inscription_by_id(inscription_id).unwrap().unwrap();
+    let output = index
+      .get_transaction(satpoint.outpoint.txid)?
+      .ok_or_not_found(|| format!("inscription {inscription_id} current transaction"))?
+      .output
+      .into_iter()
+      .nth(satpoint.outpoint.vout.try_into().unwrap())
+      .map(|tx_out| {
+        Address::from_script(&tx_out.script_pubkey, Network::Bitcoin).unwrap().to_string()
+      });
+
+    let content = content_data.clone().into_body().unwrap();
+    let timestamp = entry.timestamp;
+    let data = json!(InscribeContent{
+      content,
+      inscribe_id: inscription_id.to_string(),
+      inscribe_num: entry.number,
+      timestamp,
+      address: output.unwrap()
+    });
+    Ok(serde_json::to_vec(&data).unwrap().into_response())
   }
 
   async fn clock(Extension(index): Extension<Arc<Index>>) -> ServerResult<Response> {

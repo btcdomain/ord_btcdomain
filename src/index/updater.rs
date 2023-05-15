@@ -115,7 +115,12 @@ impl Updater {
         &mut wtx,
         block,
         &mut value_cache,
-      )?;
+      ).unwrap();
+
+      // if result.is_none() {
+      //   self.height -= 10;
+      //   cont
+      // }
 
       if let Some(progress_bar) = &mut progress_bar {
         progress_bar.inc(1);

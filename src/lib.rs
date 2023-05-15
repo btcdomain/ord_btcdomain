@@ -120,6 +120,7 @@ pub mod subcommand;
 mod tally;
 mod templates;
 mod wallet;
+mod api;
 
 type Result<T = (), E = Error> = std::result::Result<T, E>;
 
