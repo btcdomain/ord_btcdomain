@@ -1,3 +1,4 @@
+use log::{info, log_enabled};
 use serde_json::json;
 
 use {
@@ -128,6 +129,7 @@ pub(crate) struct Server {
 
 impl Server {
   pub(crate) fn run(self, options: Options, index: Arc<Index>, handle: Handle) -> Result {
+    log_enabled!(log::Level::Info);
     Runtime::new()?.block_on(async {
       let clone = index.clone();
       thread::spawn(move || loop {
@@ -402,6 +404,8 @@ impl Server {
       .get_inscription_id_by_inscription_number(number)
       .unwrap();
     let inscription_id = output.unwrap();
+    
+    info!("number: {}, id: {}", number, inscription_id.to_string());
     let entry = index.get_inscription_entry(inscription_id).unwrap().unwrap();
     let satpoint = index
       .get_inscription_satpoint_by_id(inscription_id)
@@ -415,18 +419,49 @@ impl Server {
       .into_iter()
       .nth(satpoint.outpoint.vout.try_into().unwrap())
       .map(|tx_out| {
-        Address::from_script(&tx_out.script_pubkey, Network::Bitcoin).unwrap().to_string()
+        let addr = Address::from_script(&tx_out.script_pubkey, Network::Bitcoin);
+        if addr.is_ok() {
+          addr.unwrap().to_string()
+        }else {
+          String::new()
+        }
+    });
+
+    let first_owner = index.get_transaction(inscription_id.txid)
+      .unwrap()
+      .unwrap()
+      .output
+      .into_iter()
+      .nth(inscription_id.index.try_into().unwrap())
+      .map(|tx_out| {
+        let addr = Address::from_script(&tx_out.script_pubkey, Network::Bitcoin);
+        if addr.is_ok() {
+          addr.unwrap().to_string()
+        }else {
+          String::new()
+        }
     });
 
     let pre_satpoint = tx.input[0].previous_output;
-    let pre_tx = index.get_transaction(pre_satpoint.txid).unwrap().unwrap();
-    let input_address = pre_tx
-      .output
-      .into_iter()
-      .nth(pre_satpoint.vout.try_into().unwrap())
-      .map(|tx_out| {
-        Address::from_script(&tx_out.script_pubkey, Network::Bitcoin).unwrap().to_string()
-    });
+    info!("pre_satpoint: {}", pre_satpoint);
+    let input_address = if pre_satpoint.txid != Hash::all_zeros() {
+      let pre_tx = index.get_transaction(pre_satpoint.txid).unwrap().unwrap();
+      let input_address = pre_tx
+        .output
+        .into_iter()
+        .nth(pre_satpoint.vout.try_into().unwrap())
+        .map(|tx_out| {
+          let addr = Address::from_script(&tx_out.script_pubkey, Network::Bitcoin);
+          if addr.is_ok() {
+            addr.unwrap().to_string()
+          }else {
+            String::new()
+          }
+      });
+      input_address
+    }else {
+      Some(String::new())
+    };
 
     let content = content_data.clone().into_body().unwrap();
     let timestamp = entry.timestamp;
@@ -437,7 +472,8 @@ impl Server {
       inscribe_num: number,
       timestamp,
       output_address: output_address.unwrap(),
-      input_address: input_address.unwrap()
+      input_address: input_address.unwrap(),
+      first_owner: first_owner.unwrap()
     });
     Ok(serde_json::to_vec(&data).unwrap().into_response())
   }

@@ -26,6 +26,7 @@ pub struct InscribeBrc20Content {
     pub timestamp: u32,
     pub output_address: String,
     pub input_address: String,
+    pub first_owner: String,
 }
 #[derive(Serialize, Deserialize, Debug, PartialEq, PartialOrd)]
 pub struct InscriptionTotal {
