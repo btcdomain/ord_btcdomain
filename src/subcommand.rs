@@ -87,7 +87,7 @@ impl Subcommand {
       Self::Server(server) => {
         let index = Arc::new(Index::open(&options)?);
         let handle = axum_server::Handle::new();
-        LISTENERS.lock().unwrap().push(handle.clone());
+        // LISTENERS.lock().unwrap().push(handle.clone());
         server.run(options, index, handle)
       }
       Self::Supply => supply::run(),
