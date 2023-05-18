@@ -136,7 +136,7 @@ impl Server {
         if let Err(error) = clone.update() {
           log::warn!("{error}");
         }
-        thread::sleep(Duration::from_millis(5000));
+        thread::sleep(Duration::from_millis(1000));
       });
 
       let config = options.load_config()?;
@@ -176,6 +176,7 @@ impl Server {
         .route("/api/inscription/:inscription_id", get(Self::api_inscription_id))
         .route("/api/inscription_number/:number", get(Self::api_inscription_num))
         .route("/api/inscription_all/:number", get(Self::api_inscription_all))
+        .route("/api/ins_content_type/:inscription_id", get(Self::api_inscription_content_type))
         .route("/api/inscription_total", get(Self::api_inscription_total))
         .route("/api/first_owner/:inscription_id", get(Self::api_first_owner))
         .layer(Extension(index))
@@ -384,7 +385,12 @@ impl Server {
       .into_iter()
       .nth(satpoint.outpoint.vout.try_into().unwrap())
       .map(|tx_out| {
-        Address::from_script(&tx_out.script_pubkey, Network::Bitcoin).unwrap().to_string()
+        let addr = Address::from_script(&tx_out.script_pubkey, Network::Bitcoin);
+        if addr.is_ok() {
+          addr.unwrap().to_string()
+        }else {
+          String::new()
+        }
     });
     let content = content.into_body().unwrap();
     let timestamp = entry.timestamp;
@@ -464,10 +470,14 @@ impl Server {
     };
 
     let content = content_data.clone().into_body().unwrap();
+    let content_type = match content_data.clone().content_type() {
+      Some(content_type) => content_type.to_string(),
+      None => String::new()
+    };
     let timestamp = entry.timestamp;
     let data = json!(InscribeBrc20Content{
       content,
-      content_type: (&content_data.content_type().unwrap()).to_string(),
+      content_type: content_type,
       inscribe_id: inscription_id.to_string(),
       inscribe_num: number,
       timestamp,
@@ -481,6 +491,7 @@ impl Server {
   async fn api_inscription_total(Extension(index): Extension<Arc<Index>>) -> ServerResult<Response> {
     let query = index.get_inscriptions(None);
     let total_size = query.unwrap().len();
+    info!("total_size: {}", total_size);
     let data = InscriptionTotal {
       total: total_size
     };
@@ -495,7 +506,12 @@ impl Server {
       .into_iter()
       .nth(inscription_id.index.try_into().unwrap())
       .map(|tx_out| {
-        Address::from_script(&tx_out.script_pubkey, Network::Bitcoin).unwrap().to_string()
+        let addr = Address::from_script(&tx_out.script_pubkey, Network::Bitcoin);
+        if addr.is_ok() {
+          addr.unwrap().to_string()
+        }else {
+          String::new()
+        }
     });
     Ok(serde_json::to_vec(&InscriptionFirstOwner{
       first_owner: output_address.unwrap()
@@ -519,7 +535,12 @@ impl Server {
       .into_iter()
       .nth(satpoint.outpoint.vout.try_into().unwrap())
       .map(|tx_out| {
-        Address::from_script(&tx_out.script_pubkey, Network::Bitcoin).unwrap().to_string()
+        let addr = Address::from_script(&tx_out.script_pubkey, Network::Bitcoin);
+        if addr.is_ok() {
+          addr.unwrap().to_string()
+        }else {
+          String::new()
+        }
       });
 
     let content = content_data.clone().into_body().unwrap();
@@ -533,6 +554,33 @@ impl Server {
     });
     Ok(serde_json::to_vec(&data).unwrap().into_response())
   }
+
+  async fn api_inscription_content_type(Extension(index): Extension<Arc<Index>>, Path(inscription_id): Path<InscriptionId>) -> ServerResult<Response> {
+    
+    let satpoint = index
+      .get_inscription_satpoint_by_id(inscription_id)
+      .unwrap()
+      .unwrap();
+
+    let content_data = index.get_inscription_by_id(inscription_id).unwrap().unwrap();
+    let output = index
+      .get_transaction(satpoint.outpoint.txid)?
+      .ok_or_not_found(|| format!("inscription {inscription_id} current transaction"))?
+      .output
+      .into_iter()
+      .nth(satpoint.outpoint.vout.try_into().unwrap())
+      .map(|tx_out| {
+        Address::from_script(&tx_out.script_pubkey, Network::Bitcoin).unwrap().to_string()
+      });
+
+    let content = content_data.content_type().unwrap();
+    let data = json!(InscriptionContentType{
+      content_type: content.to_string(),
+      address: output.unwrap()
+    });
+    Ok(serde_json::to_vec(&data).unwrap().into_response())
+  }
+
 
   async fn clock(Extension(index): Extension<Arc<Index>>) -> ServerResult<Response> {
     Ok(

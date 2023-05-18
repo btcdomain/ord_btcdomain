@@ -122,6 +122,7 @@ mod templates;
 mod wallet;
 mod api;
 
+
 type Result<T = (), E = Error> = std::result::Result<T, E>;
 
 const DIFFCHANGE_INTERVAL: u64 = bitcoin::blockdata::constants::DIFFCHANGE_INTERVAL as u64;

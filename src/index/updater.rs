@@ -1,3 +1,5 @@
+use log::{warn, info};
+
 use {
   self::inscription_updater::InscriptionUpdater,
   super::{fetcher::Fetcher, *},
@@ -80,7 +82,7 @@ impl Updater {
     mut wtx: WriteTransaction<'index>,
   ) -> Result {
     let starting_height = index.client.get_block_count()? + 1;
-
+    info!("height: {}, starting_height: {}", self.height, starting_height);
     let mut progress_bar = if cfg!(test)
       || log_enabled!(log::Level::Info)
       || starting_height <= self.height
@@ -108,19 +110,17 @@ impl Updater {
         Err(mpsc::RecvError) => break,
       };
 
-      self.index_block(
+      let result = self.index_block(
         index,
         &mut outpoint_sender,
         &mut value_receiver,
         &mut wtx,
         block,
         &mut value_cache,
-      ).unwrap();
-
-      // if result.is_none() {
-      //   self.height -= 10;
-      //   cont
-      // }
+      );
+      if result.is_err() {
+        return result;
+      }
 
       if let Some(progress_bar) = &mut progress_bar {
         progress_bar.inc(1);
@@ -404,6 +404,7 @@ impl Updater {
 
       if prev_hash.value() != block.header.prev_blockhash.as_ref() {
         index.reorged.store(true, atomic::Ordering::Relaxed);
+        info!("reorg detected!! prev_height: {}", prev_height);
         return Err(anyhow!("reorg detected at or before {prev_height}"));
       }
     }
@@ -653,6 +654,49 @@ impl Updater {
     self.sat_ranges_since_flush = 0;
     Index::increment_statistic(&wtx, Statistic::Commits, 1)?;
 
+    wtx.commit()?;
+    Ok(())
+  }
+
+  pub fn insert_block_for_test (index: &Index, req_height: u64) -> Result {
+    let wtx = index.begin_write()?;
+    {
+      let mut height_to_block_hash = wtx.open_table(HEIGHT_TO_BLOCK_HASH)?;
+      info!("after open table");
+      let height = height_to_block_hash
+        .range(0..)?
+        .rev()
+        .next()
+        .map(|(height, _hash)| (height.value()))
+        .unwrap_or(0);
+      if req_height < height {
+        for i in 0..height - req_height {
+            let _ = height_to_block_hash.remove(height - i);
+        }
+        height_to_block_hash.insert(&req_height, &BlockHash::from_str("00000000000000000003e706a81cb9781deafeea6f21b7b19ecd48dca8537576").unwrap().store())?;
+      }
+    }
+    wtx.commit()?;
+    Ok(())
+  }
+
+  pub fn revert_height (index: &Index, revert_height: u64) -> Result {
+    let wtx = index.begin_write()?;
+    {
+      let mut height_to_block_hash = wtx.open_table(HEIGHT_TO_BLOCK_HASH)?;
+      info!("after open table");
+      let height = height_to_block_hash
+        .range(0..)?
+        .rev()
+        .next()
+        .map(|(height, _hash)| (height.value()))
+        .unwrap_or(0);
+      if revert_height < height {
+        for i in 0..height - revert_height {
+            let _ = height_to_block_hash.remove(height - i);
+        }
+      }
+    }
     wtx.commit()?;
     Ok(())
   }

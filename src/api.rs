@@ -37,3 +37,8 @@ pub struct InscriptionTotal {
 pub struct InscriptionFirstOwner {
     pub first_owner: String,
 }
+#[derive(Serialize, Deserialize, Debug, PartialEq, PartialOrd)]
+pub struct InscriptionContentType {
+    pub content_type: String,
+    pub address: String,
+}

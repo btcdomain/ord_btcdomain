@@ -361,6 +361,14 @@ impl Index {
     Updater::update(self)
   }
 
+  pub(crate) fn test_insert_data(&self, height: u64) -> Result {
+    Updater::insert_block_for_test(self, height)
+  }
+
+  pub(crate) fn revert_height(&self, height: u64) -> Result {
+    Updater::revert_height(self, height)
+  }
+
   pub(crate) fn is_reorged(&self) -> bool {
     self.reorged.load(atomic::Ordering::Relaxed)
   }
