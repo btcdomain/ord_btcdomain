@@ -1,3 +1,4 @@
+
 use {
   self::{
     entry::{
@@ -5,6 +6,7 @@ use {
       OutPointValue, SatPointValue, SatRange,
     },
     updater::Updater,
+    reverter::Reverter,
   },
   super::*,
   crate::wallet::Wallet,
@@ -22,6 +24,7 @@ mod entry;
 mod fetcher;
 mod rtx;
 mod updater;
+mod reverter;
 
 const SCHEMA_VERSION: u64 = 3;
 
@@ -359,22 +362,22 @@ impl Index {
 
   pub(crate) fn update(&self) -> Result {
     let update_result = Updater::update(self);
-    if update_result.is_err() {
-      let err_msg = update_result.err().unwrap().to_string();
-      if err_msg.contains("reorg detected at or") {
-        let _ = self.revert_height(self.height().unwrap().unwrap().0 - 5);
-        return self.update();
-      }
-    }
+    // if update_result.is_err() {
+    //   let err_msg = update_result.err().unwrap().to_string();
+    //   if err_msg.contains("reorg detected at or") {
+    //     let _ = self.revert_height(self.height().unwrap().unwrap().0 - 5);
+    //     return self.update();
+    //   }
+    // }
     Ok(())
   }
 
   pub(crate) fn test_insert_data(&self, height: u64) -> Result {
-    Updater::insert_block_for_test(self, height)
+    Reverter::insert_block_for_test(self, height)
   }
 
   pub(crate) fn revert_height(&self, height: u64) -> Result {
-    Updater::revert_height(self, height)
+    Reverter::revert(self, height)
   }
 
   pub(crate) fn is_reorged(&self) -> bool {

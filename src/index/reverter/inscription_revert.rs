@@ -45,10 +45,10 @@ impl<'a, 'db, 'tx> InscriptionUpdater<'a, 'db, 'tx> {
     let next_number = number_to_id
       .iter()?
       .rev()
-      .map(|(number, _id)| number.value() + 1)
+      .map(|(number, _id)| number.value() )
       .next()
       .unwrap_or(0);
-    info!("start number: {next_number}");
+
     Ok(Self {
       flotsam: Vec::new(),
       height,
@@ -195,51 +195,42 @@ impl<'a, 'db, 'tx> InscriptionUpdater<'a, 'db, 'tx> {
     new_satpoint: SatPoint,
   ) -> Result {
     let inscription_id = flotsam.inscription_id.store();
-
+    info!("height: {}, ins_id: {}", self.height, flotsam.inscription_id.to_string());
     match flotsam.origin {
       Origin::Old { old_satpoint } => {
-        self.satpoint_to_id.remove(&old_satpoint.store())?;
+        // self.satpoint_to_id.remove(&old_satpoint.store())?;
       }
       Origin::New { fee } => {
         self
           .number_to_id
-          .insert(&self.next_number, &inscription_id)?;
-        info!("insert inscription, height: {}, number: {}, ins_id: {}", self.height, self.next_number, &flotsam.inscription_id.to_string());
-        let mut sat = None;
-        if let Some(input_sat_ranges) = input_sat_ranges {
-          let mut offset = 0;
-          for (start, end) in input_sat_ranges {
-            let size = end - start;
-            if offset + size > flotsam.offset {
-              let n = start + flotsam.offset - offset;
-              self.sat_to_inscription_id.insert(&n, &inscription_id)?;
-              sat = Some(Sat(n));
-              break;
-            }
-            offset += size;
-          }
-        }
+          .remove(&self.next_number)?;
 
-        self.id_to_entry.insert(
-          &inscription_id,
-          &InscriptionEntry {
-            fee,
-            height: self.height,
-            number: self.next_number,
-            sat,
-            timestamp: self.timestamp,
-          }
-          .store(),
-        )?;
+        info!("remove inscription, height: {}, number: {}, ins_id: {}", self.height, self.next_number, &flotsam.inscription_id.to_string());
+        // let mut sat = None;
+        // if let Some(input_sat_ranges) = input_sat_ranges {
+        //   let mut offset = 0;
+        //   for (start, end) in input_sat_ranges {
+        //     let size = end - start;
+        //     if offset + size > flotsam.offset {
+        //       let n = start + flotsam.offset - offset;
+        //       self.sat_to_inscription_id.remove(&n)?;
+        //       sat = Some(Sat(n));
+        //       break;
+        //     }
+        //     offset += size;
+        //   }
+        // }
 
-        self.next_number += 1;
+        self.id_to_entry.remove(&inscription_id)?;
+
+        self.next_number -= 1;
       }
     }
 
     let new_satpoint = new_satpoint.store();
 
-    self.satpoint_to_id.insert(&new_satpoint, &inscription_id)?;
-    self.id_to_satpoint.insert(&inscription_id, &new_satpoint)?;
+    self.satpoint_to_id.remove(&new_satpoint)?;
+    self.id_to_satpoint.remove(&inscription_id)?;
 
     Ok(())
   }
