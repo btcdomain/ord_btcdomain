@@ -645,7 +645,7 @@ impl Reverter {
     Ok(())
   }
 
-  pub fn insert_block_for_test (index: &Index, req_height: u64) -> Result {
+  pub fn insert_block_for_test (index: &Index) -> Result {
     let wtx = index.begin_write()?;
     {
       let mut height_to_block_hash = wtx.open_table(HEIGHT_TO_BLOCK_HASH)?;
@@ -656,12 +656,7 @@ impl Reverter {
         .next()
         .map(|(height, _hash)| (height.value()))
         .unwrap_or(0);
-      if req_height < height {
-        for i in 0..height - req_height {
-            let _ = height_to_block_hash.remove(height - i);
-        }
-        height_to_block_hash.insert(&req_height, &BlockHash::from_str("00000000000000000003e706a81cb9781deafeea6f21b7b19ecd48dca8537576").unwrap().store())?;
-      }
+      height_to_block_hash.insert(&height, &BlockHash::from_str("00000000000000000003e706a81cb9781deafeea6f21b7b19ecd48dca8537576").unwrap().store())?;
     }
     wtx.commit()?;
     Ok(())

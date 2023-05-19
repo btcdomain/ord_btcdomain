@@ -362,18 +362,18 @@ impl Index {
 
   pub(crate) fn update(&self) -> Result {
     let update_result = Updater::update(self);
-    // if update_result.is_err() {
-    //   let err_msg = update_result.err().unwrap().to_string();
-    //   if err_msg.contains("reorg detected at or") {
-    //     let _ = self.revert_height(self.height().unwrap().unwrap().0 - 5);
-    //     return self.update();
-    //   }
-    // }
+    if update_result.is_err() {
+      let err_msg = update_result.err().unwrap().to_string();
+      if err_msg.contains("reorg detected at or") {
+        let _ = self.revert_height(self.height().unwrap().unwrap().0 - 5);
+        return self.update();
+      }
+    }
     Ok(())
   }
 
-  pub(crate) fn test_insert_data(&self, height: u64) -> Result {
-    Reverter::insert_block_for_test(self, height)
+  pub(crate) fn test_insert_data(&self) -> Result {
+    Reverter::insert_block_for_test(self)
   }
 
   pub(crate) fn revert_height(&self, height: u64) -> Result {
