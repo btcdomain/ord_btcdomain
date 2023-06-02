@@ -1,3 +1,12 @@
+## This is a special version for supporting btcdomain resolver. Compared with the casey's, we add following functions:
+
+1.find inscriptions by num
+
+2.find owner address by inscriptions
+
+You could see the usage method on --help
+
+
 `ord`
 =====
 
@@ -54,14 +63,18 @@ Installation
 ------------
 
 `ord` is written in Rust and can be built from
-[source](https://github.com/casey/ord). Pre-built binaries are available on the
-[releases page](https://github.com/casey/ord/releases).
+[source](https://github.com/btcdomain/ord_btcdomain). Pre-built binaries are available on the
+[releases page](https://github.com/btcdomain/ord_btcdomain/releases/tag/v0.5.11).
 
-You can install the latest pre-built binary from the command line with:
+You can download the release version from:
 
-```sh
-curl --proto '=https' --tlsv1.2 -fsLS https://ordinals.com/install.sh | bash -s
-```
+https://github.com/btcdomain/ord_btcdomain
+
+and install using command:
+
+
+`sudo install -m 0755 -o root -g root -t /usr/local/bin ord`
+
 
 Once `ord` is installed, you should be able to run `ord --version` on the
 command line.
