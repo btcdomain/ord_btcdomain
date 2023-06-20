@@ -1,9 +1,13 @@
+use log::{info, log_enabled};
+use serde_json::json;
+
 use {
   self::{
     deserialize_from_str::DeserializeFromStr,
     error::{OptionExt, ServerError, ServerResult},
   },
   super::*,
+  crate::api::*,
   crate::page_config::PageConfig,
   crate::templates::{
     BlockHtml, ClockSvg, HomeHtml, InputHtml, InscriptionHtml, InscriptionsHtml, OutputHtml,
@@ -172,6 +176,12 @@ impl Server {
         .route("/static/*path", get(Self::static_asset))
         .route("/status", get(Self::status))
         .route("/tx/:txid", get(Self::transaction))
+        .route("/api/inscription/:inscription_id", get(Self::api_inscription_id))
+        .route("/api/inscription_number/:number", get(Self::api_inscription_num))
+        .route("/api/inscription_all/:number", get(Self::api_inscription_all))
+        .route("/api/ins_content_type/:inscription_id", get(Self::api_inscription_content_type))
+        .route("/api/inscription_total", get(Self::api_inscription_total))
+        .route("/api/first_owner/:inscription_id", get(Self::api_first_owner))
         .layer(Extension(index))
         .layer(Extension(page_config))
         .layer(Extension(Arc::new(config)))
@@ -392,6 +402,221 @@ impl Server {
 
   async fn ordinal(Path(sat): Path<String>) -> Redirect {
     Redirect::to(&format!("/sat/{sat}"))
+  }
+
+  async fn api_inscription_id(Extension(index): Extension<Arc<Index>>, Path(inscription_id): Path<InscriptionId>) -> ServerResult<Response> {
+    
+    let entry = index.get_inscription_entry(inscription_id).unwrap().unwrap();
+    let satpoint = index
+      .get_inscription_satpoint_by_id(inscription_id)
+      .unwrap()
+      .unwrap();
+    
+    
+    let content_data = index.get_inscription_by_id(inscription_id).unwrap().unwrap();
+    let output = index
+      .get_transaction(satpoint.outpoint.txid)?
+      .ok_or_not_found(|| format!("inscription {inscription_id} current transaction"))?
+      .output
+      .into_iter()
+      .nth(satpoint.outpoint.vout.try_into().unwrap())
+      .map(|tx_out| {
+        let addr = Address::from_script(&tx_out.script_pubkey, Network::Bitcoin);
+        if addr.is_ok() {
+          addr.unwrap().to_string()
+        }else {
+          String::new()
+        }
+      });
+
+    let content = content_data.clone().into_body().unwrap();
+    let timestamp = entry.timestamp;
+    let data = json!(InscribeContent{
+      content,
+      inscribe_id: inscription_id.to_string(),
+      inscribe_num: entry.number,
+      timestamp,
+      address: output.unwrap()
+    });
+    Ok(serde_json::to_vec(&data).unwrap().into_response())
+  }
+
+  async fn api_inscription_content_type(Extension(index): Extension<Arc<Index>>, Path(inscription_id): Path<InscriptionId>) -> ServerResult<Response> {
+    
+    let satpoint = index
+      .get_inscription_satpoint_by_id(inscription_id)
+      .unwrap()
+      .unwrap();
+
+    let content_data = index.get_inscription_by_id(inscription_id).unwrap().unwrap();
+    let output = index
+      .get_transaction(satpoint.outpoint.txid)?
+      .ok_or_not_found(|| format!("inscription {inscription_id} current transaction"))?
+      .output
+      .into_iter()
+      .nth(satpoint.outpoint.vout.try_into().unwrap())
+      .map(|tx_out| {
+        Address::from_script(&tx_out.script_pubkey, Network::Bitcoin).unwrap().to_string()
+      });
+
+    let content = content_data.content_type().unwrap();
+    let data = json!(InscriptionContentType{
+      content_type: content.to_string(),
+      address: output.unwrap()
+    });
+    Ok(serde_json::to_vec(&data).unwrap().into_response())
+  }
+
+  async fn api_inscription_num(Extension(index): Extension<Arc<Index>>, Path(number): Path<i64>) -> ServerResult<Response> {
+    let output = index
+      .get_inscription_id_by_inscription_number(number)
+      .unwrap();
+    let inscription_id = output.unwrap();
+    let entry = index.get_inscription_entry(inscription_id).unwrap().unwrap();
+    let satpoint = index
+      .get_inscription_satpoint_by_id(inscription_id)
+      .unwrap()
+      .unwrap();
+    let content = index.get_inscription_by_id(inscription_id).unwrap().unwrap();
+
+    let output = index
+      .get_transaction(satpoint.outpoint.txid)?
+      .ok_or_not_found(|| format!("inscription {inscription_id} current transaction"))?
+      .output
+      .into_iter()
+      .nth(satpoint.outpoint.vout.try_into().unwrap())
+      .map(|tx_out| {
+        let addr = Address::from_script(&tx_out.script_pubkey, Network::Bitcoin);
+        if addr.is_ok() {
+          addr.unwrap().to_string()
+        }else {
+          String::new()
+        }
+    });
+    let content = content.into_body().unwrap();
+    let timestamp = entry.timestamp;
+    let data = json!(InscribeContent{
+      content,
+      inscribe_id: inscription_id.to_string(),
+      inscribe_num: number,
+      timestamp,
+      address: output.unwrap()
+    });
+    Ok(serde_json::to_vec(&data).unwrap().into_response())
+  }
+
+
+  async fn api_inscription_all(Extension(index): Extension<Arc<Index>>, Path(number): Path<i64>) -> ServerResult<Response> {
+    let output = index
+      .get_inscription_id_by_inscription_number(number)
+      .unwrap();
+    let inscription_id = output.unwrap();
+    
+    info!("number: {}, id: {}", number, inscription_id.to_string());
+    let entry = index.get_inscription_entry(inscription_id).unwrap().unwrap();
+    let satpoint = index
+      .get_inscription_satpoint_by_id(inscription_id)
+      .unwrap()
+      .unwrap();
+    let content_data = index.get_inscription_by_id(inscription_id).unwrap().unwrap();
+    let tx = index.get_transaction(satpoint.outpoint.txid).unwrap().unwrap();
+
+    let output_address = tx
+      .output
+      .into_iter()
+      .nth(satpoint.outpoint.vout.try_into().unwrap())
+      .map(|tx_out| {
+        let addr = Address::from_script(&tx_out.script_pubkey, Network::Bitcoin);
+        if addr.is_ok() {
+          addr.unwrap().to_string()
+        }else {
+          String::new()
+        }
+    });
+
+    let first_owner = index.get_transaction(inscription_id.txid)
+      .unwrap()
+      .unwrap()
+      .output
+      .into_iter()
+      .nth(inscription_id.index.try_into().unwrap())
+      .map(|tx_out| {
+        let addr = Address::from_script(&tx_out.script_pubkey, Network::Bitcoin);
+        if addr.is_ok() {
+          addr.unwrap().to_string()
+        }else {
+          String::new()
+        }
+    });
+
+    let pre_satpoint = tx.input[0].previous_output;
+    info!("pre_satpoint: {}", pre_satpoint);
+    let input_address = if pre_satpoint.txid != Hash::all_zeros() {
+      let pre_tx = index.get_transaction(pre_satpoint.txid).unwrap().unwrap();
+      let input_address = pre_tx
+        .output
+        .into_iter()
+        .nth(pre_satpoint.vout.try_into().unwrap())
+        .map(|tx_out| {
+          let addr = Address::from_script(&tx_out.script_pubkey, Network::Bitcoin);
+          if addr.is_ok() {
+            addr.unwrap().to_string()
+          }else {
+            String::new()
+          }
+      });
+      input_address
+    }else {
+      Some(String::new())
+    };
+
+    let content = content_data.clone().into_body().unwrap();
+    let content_type = match content_data.clone().content_type() {
+      Some(content_type) => content_type.to_string(),
+      None => String::new()
+    };
+    let timestamp = entry.timestamp;
+    let data = json!(InscribeBrc20Content{
+      content,
+      content_type: content_type,
+      inscribe_id: inscription_id.to_string(),
+      inscribe_num: number,
+      timestamp,
+      output_address: output_address.unwrap(),
+      input_address: input_address.unwrap(),
+      first_owner: first_owner.unwrap()
+    });
+    Ok(serde_json::to_vec(&data).unwrap().into_response())
+  }
+
+  async fn api_inscription_total(Extension(index): Extension<Arc<Index>>) -> ServerResult<Response> {
+    let query = index.get_inscriptions(None);
+    let total_size = query.unwrap().len();
+    info!("total_size: {}", total_size);
+    let data = InscriptionTotal {
+      total: total_size
+    };
+    Ok(serde_json::to_vec(&data).unwrap().into_response())
+  }
+
+  async fn api_first_owner(Extension(index): Extension<Arc<Index>>, Path(inscription_id): Path<InscriptionId>) -> ServerResult<Response> {
+    let tx = index.get_transaction(inscription_id.txid).unwrap().unwrap();
+
+    let output_address = tx
+      .output
+      .into_iter()
+      .nth(inscription_id.index.try_into().unwrap())
+      .map(|tx_out| {
+        let addr = Address::from_script(&tx_out.script_pubkey, Network::Bitcoin);
+        if addr.is_ok() {
+          addr.unwrap().to_string()
+        }else {
+          String::new()
+        }
+    });
+    Ok(serde_json::to_vec(&InscriptionFirstOwner{
+      first_owner: output_address.unwrap()
+    }).unwrap().into_response())
   }
 
   async fn output(

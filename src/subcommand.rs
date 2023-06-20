@@ -12,6 +12,11 @@ pub mod subsidy;
 pub mod supply;
 pub mod traits;
 pub mod wallet;
+pub mod find_by_number;
+pub mod find_content;
+pub mod find_addr;
+pub mod find_by_id;
+pub mod find_cur_num;
 
 fn print_json(output: impl Serialize) -> Result {
   serde_json::to_writer_pretty(io::stdout(), &output)?;
@@ -45,6 +50,17 @@ pub(crate) enum Subcommand {
   Traits(traits::Traits),
   #[clap(subcommand, about = "Wallet commands")]
   Wallet(wallet::Wallet),
+
+  #[clap(about = "query inscribe by number")]
+  FindNumber(find_by_number::FindNumber),
+  #[clap(about = "query inscribe by number")]
+  FindContent(find_content::FindContent),
+  #[clap(about = "query inscribe by number")]
+  FindAddr(find_addr::FindAddr),
+  #[clap(about = "query inscribe by id")]
+  FindById(find_by_id::FindById),
+  #[clap(about = "query current number")]
+  FindCurNum(find_cur_num::FindCurNum),
 }
 
 impl Subcommand {
@@ -67,6 +83,11 @@ impl Subcommand {
       Self::Supply => supply::run(),
       Self::Traits(traits) => traits.run(),
       Self::Wallet(wallet) => wallet.run(options),
+      Self::FindNumber(find_number) => find_number.run(options),
+      Self::FindContent(find_content) => find_content.run(options),
+      Self::FindAddr(find_addr) => find_addr.run(options),
+      Self::FindById(find_by_id) => find_by_id.run(options),
+      Self::FindCurNum(find_cur_num) => find_cur_num.run(options),
     }
   }
 }
