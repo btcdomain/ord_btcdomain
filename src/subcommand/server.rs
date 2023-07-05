@@ -1,3 +1,5 @@
+use std::path;
+
 use log::{info, log_enabled};
 use serde_json::json;
 
@@ -407,13 +409,11 @@ impl Server {
   }
 
   async fn api_inscription_id(Extension(index): Extension<Arc<Index>>, Path(inscription_id): Path<InscriptionId>) -> ServerResult<Response> {
-    
     let entry = index.get_inscription_entry(inscription_id).unwrap().unwrap();
     let satpoint = index
       .get_inscription_satpoint_by_id(inscription_id)
       .unwrap()
       .unwrap();
-    
     
     let content_data = index.get_inscription_by_id(inscription_id).unwrap().unwrap();
     let output = index
@@ -423,7 +423,7 @@ impl Server {
       .into_iter()
       .nth(satpoint.outpoint.vout.try_into().unwrap())
       .map(|tx_out| {
-        let addr = Address::from_script(&tx_out.script_pubkey, Network::Bitcoin);
+        let addr = Address::from_script(&tx_out.script_pubkey, index.get_network_by_path());
         if addr.is_ok() {
           addr.unwrap().to_string()
         }else {
@@ -458,7 +458,7 @@ impl Server {
       .into_iter()
       .nth(satpoint.outpoint.vout.try_into().unwrap())
       .map(|tx_out| {
-        Address::from_script(&tx_out.script_pubkey, Network::Bitcoin).unwrap().to_string()
+        Address::from_script(&tx_out.script_pubkey, index.get_network_by_path()).unwrap().to_string()
       });
 
     let content = content_data.content_type().unwrap();
@@ -488,7 +488,7 @@ impl Server {
       .into_iter()
       .nth(satpoint.outpoint.vout.try_into().unwrap())
       .map(|tx_out| {
-        let addr = Address::from_script(&tx_out.script_pubkey, Network::Bitcoin);
+        let addr = Address::from_script(&tx_out.script_pubkey, index.get_network_by_path());
         if addr.is_ok() {
           addr.unwrap().to_string()
         }else {
@@ -528,7 +528,7 @@ impl Server {
       .into_iter()
       .nth(satpoint.outpoint.vout.try_into().unwrap())
       .map(|tx_out| {
-        let addr = Address::from_script(&tx_out.script_pubkey, Network::Bitcoin);
+        let addr = Address::from_script(&tx_out.script_pubkey, index.get_network_by_path());
         if addr.is_ok() {
           addr.unwrap().to_string()
         }else {
@@ -543,7 +543,7 @@ impl Server {
       .into_iter()
       .nth(inscription_id.index.try_into().unwrap())
       .map(|tx_out| {
-        let addr = Address::from_script(&tx_out.script_pubkey, Network::Bitcoin);
+        let addr = Address::from_script(&tx_out.script_pubkey, index.get_network_by_path());
         if addr.is_ok() {
           addr.unwrap().to_string()
         }else {
@@ -560,7 +560,7 @@ impl Server {
         .into_iter()
         .nth(pre_satpoint.vout.try_into().unwrap())
         .map(|tx_out| {
-          let addr = Address::from_script(&tx_out.script_pubkey, Network::Bitcoin);
+          let addr = Address::from_script(&tx_out.script_pubkey, index.get_network_by_path());
           if addr.is_ok() {
             addr.unwrap().to_string()
           }else {
@@ -609,7 +609,7 @@ impl Server {
       .into_iter()
       .nth(inscription_id.index.try_into().unwrap())
       .map(|tx_out| {
-        let addr = Address::from_script(&tx_out.script_pubkey, Network::Bitcoin);
+        let addr = Address::from_script(&tx_out.script_pubkey, index.get_network_by_path());
         if addr.is_ok() {
           addr.unwrap().to_string()
         }else {
@@ -1015,11 +1015,11 @@ impl Server {
     );
     headers.insert(
       header::CONTENT_SECURITY_POLICY,
-      HeaderValue::from_static("default-src 'self' 'unsafe-eval' 'unsafe-inline' data: blob:"),
+      HeaderValue::from_static("default-src 'self' 'unsafe-eval' 'unsafe-inline' data:"),
     );
     headers.append(
       header::CONTENT_SECURITY_POLICY,
-      HeaderValue::from_static("default-src *:*/content/ *:*/blockheight *:*/blockhash *:*/blockhash/ *:*/blocktime 'unsafe-eval' 'unsafe-inline' data: blob:"),
+      HeaderValue::from_static("default-src *:*/content/ *:*/blockheight *:*/blockhash *:*/blockhash/ *:*/blocktime 'unsafe-eval' 'unsafe-inline' data:"),
     );
 
     let body = inscription.into_body();
@@ -2537,7 +2537,7 @@ mod tests {
     server.assert_response_csp(
       format!("/preview/{}", InscriptionId::from(txid)),
       StatusCode::OK,
-      "default-src 'self' 'unsafe-eval' 'unsafe-inline' data: blob:",
+      "default-src 'self' 'unsafe-eval' 'unsafe-inline' data:",
       "hello",
     );
   }

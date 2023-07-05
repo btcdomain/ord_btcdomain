@@ -49,8 +49,8 @@ impl FindNumber {
 
     // println!("satpoint: {:?}", satpoint);
     let tx = index.get_transaction(satpoint.outpoint.txid).unwrap().unwrap();
-    let output_address = get_address_from_tx(satpoint.outpoint, &index);
-    let input_address = get_address_from_tx(tx.input[0].previous_output, &index);
+    let output_address = get_address_from_tx(options.chain().network(),satpoint.outpoint, &index);
+    let input_address = get_address_from_tx(options.chain().network(),tx.input[0].previous_output, &index);
 
     let content = index.get_inscription_by_id(inscription_id).unwrap();
     if content.is_some() {
@@ -69,7 +69,7 @@ impl FindNumber {
     }
   }
 }
-fn get_address_from_tx(outpoint: OutPoint, index: &Index) -> String {
+fn get_address_from_tx(network:Network,outpoint: OutPoint, index: &Index) -> String {
   let output = index.get_transaction(outpoint.txid).unwrap();
   if output.is_some() {
     let out_address = output
@@ -78,7 +78,7 @@ fn get_address_from_tx(outpoint: OutPoint, index: &Index) -> String {
       .into_iter()
       .nth(outpoint.vout.try_into().unwrap())
       .map(|out| {
-        Address::from_script(&out.script_pubkey, Network::Bitcoin).unwrap().to_string()
+        Address::from_script(&out.script_pubkey, network).unwrap().to_string()
       });
     if out_address.is_some() {
       out_address.unwrap()

@@ -454,6 +454,21 @@ impl Index {
     self.begin_read()?.block_count()
   }
 
+  pub(crate) fn get_network_by_path(&self) -> Network {
+    let path=self.path.clone().into_os_string().into_string();
+    if path.is_ok(){
+      let p=path.unwrap();
+      if p.contains("regtest"){
+        return Network::Regtest;
+      }else if p.contains("testnet"){
+        return Network::Testnet;
+      }else if p.contains("signet"){
+        return Network::Signet;
+      }
+    }
+    return Network::Bitcoin;
+  }
+
   pub(crate) fn block_height(&self) -> Result<Option<Height>> {
     self.begin_read()?.block_height()
   }
@@ -706,7 +721,7 @@ impl Index {
 
   pub(crate) fn list(&self, outpoint: OutPoint) -> Result<Option<List>> {
     self.require_sat_index("list")?;
-
+    
     let array = outpoint.store();
 
     let sat_ranges = self.list_inner(array)?;
