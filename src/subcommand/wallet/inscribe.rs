@@ -48,6 +48,8 @@ pub(crate) struct Inscribe {
   pub(crate) no_limit: bool,
   #[clap(long, help = "Don't sign or broadcast transactions.")]
   pub(crate) dry_run: bool,
+  #[clap(long, help = "Whether to use un-safe utxo.")]
+  pub(crate) un_safe: Option<bool>,
   #[clap(long, help = "Send inscription to <DESTINATION>.")]
   pub(crate) destination: Option<Address>,
 }
@@ -61,8 +63,17 @@ impl Inscribe {
 
     let client = options.bitcoin_rpc_client_for_wallet_command(false)?;
 
-    let mut utxos = index.get_unspent_outputs(Wallet::load(&options)?)?;
-
+    let mut utxos;
+    if let Some(un_safe) = self.un_safe {
+        if un_safe {
+            utxos = index.get_pending_unspent_outputs(Wallet::load(&options)?)?;
+        } else {
+            utxos = index.get_unspent_outputs(Wallet::load(&options)?)?;
+        }
+    } else {
+        utxos = index.get_unspent_outputs(Wallet::load(&options)?)?;
+    }
+    
     let inscriptions = index.get_inscriptions(None)?;
 
     let commit_tx_change = [get_change_address(&client)?, get_change_address(&client)?];

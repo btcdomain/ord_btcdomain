@@ -296,6 +296,40 @@ impl Index {
     Ok(utxos)
   }
 
+
+  pub(crate) fn get_pending_unspent_outputs(&self, _wallet: Wallet) -> Result<BTreeMap<OutPoint, Amount>> {
+    let mut utxos = BTreeMap::new();
+    utxos.extend(
+      self
+        .client
+        .list_unspent(None, None, None, Some(true), None)?
+        .into_iter()
+        .map(|utxo| {
+          let outpoint = OutPoint::new(utxo.txid, utxo.vout);
+          let amount = utxo.amount;
+
+          (outpoint, amount)
+        }),
+    );
+
+    #[derive(Deserialize)]
+    pub(crate) struct JsonOutPoint {
+      txid: bitcoin::Txid,
+      vout: u32,
+    }
+
+    for JsonOutPoint { txid, vout } in self
+      .client
+      .call::<Vec<JsonOutPoint>>("listlockunspent", &[])?
+    {
+      utxos.insert(
+        OutPoint { txid, vout },
+        Amount::from_sat(self.client.get_raw_transaction(&txid, None)?.output[vout as usize].value),
+      );
+    }
+    Ok(utxos)
+  }
+
   pub(crate) fn get_unspent_output_ranges(
     &self,
     wallet: Wallet,
