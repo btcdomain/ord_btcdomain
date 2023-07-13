@@ -304,10 +304,10 @@ impl Index {
         .client
         .list_unspent(None, None, None, Some(true), None)?
         .into_iter()
+        .filter(|utxo| utxo.amount.to_sat() > 546)
         .map(|utxo| {
           let outpoint = OutPoint::new(utxo.txid, utxo.vout);
           let amount = utxo.amount;
-
           (outpoint, amount)
         }),
     );

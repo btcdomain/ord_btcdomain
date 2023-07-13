@@ -1,6 +1,5 @@
-use std::path;
 
-use log::{info, log_enabled};
+use log::{info};
 use serde_json::json;
 
 use {
