@@ -1,74 +1,56 @@
 use super::*;
 
 #[derive(Debug, Parser)]
-pub(crate) struct FindNumber {
-  #[clap(help = "Find inscribe by number.")]
-  number: i64,
+pub(crate) struct FindById {
+  #[clap(help = "Find inscribe by id.")]
+  id: String,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Output {
   pub content: Vec<u8>,
+  pub content_type: String,
   pub inscribe_num: i64,
-  pub inscribe_id: String,
-  pub sat: u64,
   pub output_address: String,
   pub input_address: String
 }
 
-impl FindNumber {
+impl FindById {
   pub(crate) fn run(self, options: Options) -> Result {
     let index = Index::open(&options)?;
 
     index.update()?;
 
-    let output = index
-      .get_inscription_id_by_inscription_number(self.number)
-      .unwrap();
-    let inscription_id = output.unwrap();
-
-    // println!("inscription_id: {:?}", inscription_id);
-    // let entry = index.get_inscription_entry(inscription_id).unwrap();
-    // // println!("entry: {:?}", entry);
-    // let sat = if entry.is_some() {
-    //   let sats = entry.unwrap().sat;
-    //   // println!("sats: {:?}", sats);
-    //   if sats.is_some() {
-    //     sats.unwrap().0
-    //   } else {
-    //     0
-    //   }
-    // } else {
-    //   0
-    // };
+    let inscription_id = self.id.parse::<InscriptionId>().unwrap();
+    let entry = index.get_inscription_entry(inscription_id).unwrap();
 
     let satpoint = index
       .get_inscription_satpoint_by_id(inscription_id)
       .unwrap()
       .unwrap();
 
-    // println!("satpoint: {:?}", satpoint);
     let tx = index.get_transaction(satpoint.outpoint.txid).unwrap().unwrap();
     let output_address = get_address_from_tx(options.chain().network(),satpoint.outpoint, &index);
     let input_address = get_address_from_tx(options.chain().network(),tx.input[0].previous_output, &index);
 
     let content = index.get_inscription_by_id(inscription_id).unwrap();
     if content.is_some() {
+      let content_value = content.unwrap();
       print_json(Output {
-        content: content.unwrap().into_body().unwrap(),
-        inscribe_num: self.number,
-        inscribe_id: inscription_id.to_string(),
-        sat: 0,
+        content: content_value.clone().into_body().unwrap(),
+        content_type: (&content_value.content_type().unwrap()).to_string(),
+        inscribe_num: entry.unwrap().number,
         output_address,
         input_address
       })
       .unwrap();
       Ok(())
     } else {
-      Err(anyhow!("query inscribe by number failed"))
+      Err(anyhow!("query inscribe by id failed"))
     }
   }
 }
+
 fn get_address_from_tx(network:Network,outpoint: OutPoint, index: &Index) -> String {
   let output = index.get_transaction(outpoint.txid).unwrap();
   if output.is_some() {

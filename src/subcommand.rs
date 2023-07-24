@@ -14,6 +14,9 @@ pub mod subsidy;
 pub mod supply;
 pub mod traits;
 pub mod wallet;
+pub mod find_addr;
+pub mod find_by_id;
+pub mod find_cur_num;
 
 fn print_json(output: impl Serialize) -> Result {
   serde_json::to_writer_pretty(io::stdout(), &output)?;
@@ -33,8 +36,8 @@ pub(crate) enum Subcommand {
   FindContent(find_content::FindContent),
   #[clap(about = "Find a satoshi's current location")]
   Find(find::Find),
-  #[clap(about = "Update the index")]
-  Index,
+  #[clap(subcommand, about = "Index commands")]
+  Index(index::IndexSubcommand),
   #[clap(about = "Display index statistics")]
   Info(info::Info),
   #[clap(about = "List the satoshis in an output")]
@@ -51,6 +54,12 @@ pub(crate) enum Subcommand {
   Traits(traits::Traits),
   #[clap(subcommand, about = "Wallet commands")]
   Wallet(wallet::Wallet),
+  #[clap(about = "query inscribe by number")]
+  FindAddr(find_addr::FindAddr),
+  #[clap(about = "query inscribe by id")]
+  FindById(find_by_id::FindById),
+  #[clap(about = "query current number")]
+  FindCurNum(find_cur_num::FindCurNum),
 }
 
 impl Subcommand {
@@ -61,7 +70,7 @@ impl Subcommand {
       Self::FindNumber(find_number) => find_number.run(options),
       Self::FindContent(find_content) => find_content.run(options),
       Self::Find(find) => find.run(options),
-      Self::Index => index::run(options),
+      Self::Index(index) => index.run(options),
       Self::Info(info) => info.run(options),
       Self::List(list) => list.run(options),
       Self::Parse(parse) => parse.run(),
@@ -75,6 +84,9 @@ impl Subcommand {
       Self::Supply => supply::run(),
       Self::Traits(traits) => traits.run(),
       Self::Wallet(wallet) => wallet.run(options),
+      Self::FindAddr(find_addr) => find_addr.run(options),
+      Self::FindById(find_by_id) => find_by_id.run(options),
+      Self::FindCurNum(find_cur_num) => find_cur_num.run(options),
     }
   }
 }
