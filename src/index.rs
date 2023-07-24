@@ -260,6 +260,7 @@ impl Index {
         .client
         .list_unspent(None, None, None, None, None)?
         .into_iter()
+        .filter(|utxo| utxo.amount.to_sat() > 2000)
         .map(|utxo| {
           let outpoint = OutPoint::new(utxo.txid, utxo.vout);
           let amount = utxo.amount;
@@ -304,7 +305,7 @@ impl Index {
         .client
         .list_unspent(None, None, None, Some(true), None)?
         .into_iter()
-        .filter(|utxo| utxo.amount.to_sat() > 546)
+        .filter(|utxo| utxo.amount.to_sat() > 2000)
         .map(|utxo| {
           let outpoint = OutPoint::new(utxo.txid, utxo.vout);
           let amount = utxo.amount;

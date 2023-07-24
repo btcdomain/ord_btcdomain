@@ -117,6 +117,7 @@ impl TransactionBuilder {
   const MAX_POSTAGE: Amount = Amount::from_sat(2 * 10_000);
   const SCHNORR_SIGNATURE_SIZE: usize = 64;
   pub(crate) const TARGET_POSTAGE: Amount = Amount::from_sat(546);
+  pub(crate) const TARGET_POSTAGE_330: Amount = Amount::from_sat(330);
 
   pub fn build_transaction_with_postage(
     outgoing: SatPoint,
