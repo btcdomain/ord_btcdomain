@@ -204,7 +204,7 @@ impl Inscribe {
 
     let reveal_script = inscription.append_reveal_script(
       ScriptBuf::builder()
-        .push_slice(public_key.serialize())
+        .push_slice(&public_key.serialize())
         .push_opcode(opcodes::all::OP_CHECKSIG),
     );
 

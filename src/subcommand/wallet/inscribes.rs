@@ -1,19 +1,20 @@
-use bitcoincore_rpc::RawTx;
 use std::io::Write;
+use bitcoincore_rpc::RawTx;
 use {
   super::*,
   crate::wallet::Wallet,
   bitcoin::{
     blockdata::{opcodes, script},
+    key::PrivateKey,
+    key::{TapTweak, TweakedKeyPair, TweakedPublicKey, UntweakedKeyPair},
+    locktime::absolute::LockTime,
     policy::MAX_STANDARD_TX_WEIGHT,
-    schnorr::{UntweakedKeyPair,TweakedKeyPair,TapTweak,TweakedPublicKey},
-    util::key::PrivateKey,
     secp256k1::{
       self, constants::SCHNORR_SIGNATURE_SIZE, rand, schnorr::Signature, Secp256k1, XOnlyPublicKey,
     },
-    util::sighash::{Prevouts, SighashCache},
-    util::taproot::{ControlBlock, LeafVersion, TapLeafHash, TaprootBuilder},
-    PackedLockTime, SchnorrSighashType, Witness,
+    sighash::{Prevouts, SighashCache, TapSighashType},
+    taproot::{ControlBlock, LeafVersion, TapLeafHash, TaprootBuilder},
+     Witness,
   },
   std::collections::BTreeSet,
   log::info
@@ -50,7 +51,7 @@ pub(crate) struct Inscribes {
   #[clap(long, help = "Whether to use un-safe utxo.")]
   pub(crate) mint_size: u64,
   #[clap(long, help = "Send inscription to <DESTINATION>.")]
-  pub(crate) destination: Option<Address>,
+  pub(crate) destination: Option<Address<NetworkUnchecked>>,
   #[clap(long, help = "Whether to use un-safe utxo.")]
   pub(crate) un_safe: Option<bool>,
   #[clap(long, help = "Whether to use sleep. defualt 1.2 s, for exsample:1.3.")]
@@ -58,7 +59,7 @@ pub(crate) struct Inscribes {
   #[clap(long, help = "Whether to use only_commit. defualt false, for exsample: only-commit true")]
   pub(crate) only_commit: Option<bool>,
   #[clap(long, help = "Send change_address to <change_address>.")]
-  pub(crate) change_address: Option<Address>,
+  pub(crate) change_address: Option<Address<NetworkUnchecked>>,
 }
 
 impl Inscribes {
@@ -84,23 +85,13 @@ impl Inscribes {
     let inscriptions = index.get_inscriptions(None)?;
 
     let reveal_tx_destination = match self.destination {
-      Some(address) => {
-        options
-          .chain()
-          .check_address_is_valid_for_network(&address)?;
-        address
-      }
-      None => get_change_address(&client)?,
+      Some(address) => address.require_network(options.chain().network())?,
+      None => get_change_address(&client,&options)?,
     };
 
     let commit_tx_change = match self.change_address {
-      Some(address) => {
-        options
-          .chain()
-          .check_address_is_valid_for_network(&address)?;
-        address
-      }
-      None => get_change_address(&client)?,
+      Some(address) => address.require_network(options.chain().network())?,
+      None => get_change_address(&client,&options)?,
     };
 
     //过滤utxo
@@ -328,12 +319,12 @@ impl Inscribes {
     //计算vsize的消息
     let transaction = Transaction {
       version: 1,
-      lock_time: PackedLockTime::ZERO,
+      lock_time: LockTime::ZERO,
       input: utxos.clone()
         .iter()
         .map(|outpoint| TxIn {
           previous_output: *outpoint.0,
-          script_sig: Script::new(),
+          script_sig: script::Builder::new().into_script(),
           sequence: Sequence::ENABLE_RBF_NO_LOCKTIME,
           witness: Witness::new(),
         })
@@ -358,12 +349,12 @@ impl Inscribes {
     //真实的消息
     let transaction = Transaction {
       version: 1,
-      lock_time: PackedLockTime::ZERO,
+      lock_time: LockTime::ZERO,
       input: utxos
         .iter()
         .map(|outpoint| TxIn {
           previous_output: *outpoint.0,
-          script_sig: Script::new(),
+          script_sig: script::Builder::new().into_script(),
           sequence: Sequence::ENABLE_RBF_NO_LOCKTIME,
           witness: Witness::new(),
         })
@@ -434,12 +425,12 @@ impl Inscribes {
           0,
           &Prevouts::All(&[ele.1]),
           TapLeafHash::from_script(&reveal_script, LeafVersion::TapScript),
-          SchnorrSighashType::Default,
+          TapSighashType::Default,
         )
         .expect("signature hash should compute");
 
       let signature = secp256k1.sign_schnorr(
-        &secp256k1::Message::from_slice(signature_hash.as_inner())
+        &secp256k1::Message::from_slice(signature_hash.as_ref())
           .expect("should be cryptographically secure hash"),
         &key_pair,
       );
@@ -450,7 +441,7 @@ impl Inscribes {
       witness.push(reveal_script);
       witness.push(&control_block.serialize());
       let reveal_weight = reveal_tx.weight();
-      if !no_limit && reveal_weight > MAX_STANDARD_TX_WEIGHT.try_into().unwrap() {
+      if !no_limit && reveal_weight > bitcoin::Weight::from_wu(MAX_STANDARD_TX_WEIGHT.into()) {
         bail!(
               "reveal transaction weight greater than {MAX_STANDARD_TX_WEIGHT} (MAX_STANDARD_TX_WEIGHT): {reveal_weight}"
             );
@@ -487,7 +478,7 @@ impl Inscribes {
         sequence: Sequence::ENABLE_RBF_NO_LOCKTIME,
       }],
       output: vec![output],
-      lock_time: PackedLockTime::ZERO,
+      lock_time: LockTime::ZERO,
       version: 1,
     };
 
