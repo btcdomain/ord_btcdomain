@@ -1,4 +1,4 @@
-
+use axum::Json;
 use log::{info};
 use serde_json::json;
 
@@ -187,6 +187,9 @@ impl Server {
         .route("/api/ins_content_type/:inscription_id", get(Self::api_inscription_content_type))
         .route("/api/inscription_total", get(Self::api_inscription_total))
         .route("/api/first_owner/:inscription_id", get(Self::api_first_owner))
+        .route("/api/inscription_satpoint/:inscription_id", get(Self::api_inscription_satpoint))
+        .route("/api/indexed_utxos/:utxos", get(Self::api_indexed_utxos))
+        .route("/api/inscriptions", get(Self::api_inscriptions))
         .layer(Extension(index))
         .layer(Extension(page_config))
         .layer(Extension(Arc::new(config)))
@@ -411,13 +414,45 @@ impl Server {
     Redirect::to(&format!("/sat/{sat}"))
   }
 
+  async fn api_inscriptions(Extension(index): Extension<Arc<Index>>) -> ServerResult<Response> {
+    let result = index.get_inscriptions(None);
+    match result {
+      Ok(data) => {
+        Ok(serde_json::to_vec(&data).unwrap().into_response())
+      },
+      Err(err) => {
+        Err(ServerError::Internal(err))
+      }
+    }
+  }
+  /// get indexed utxos
+  async fn api_indexed_utxos(Extension(index): Extension<Arc<Index>>, Json(payload):Json<UtxoPayload>) -> ServerResult<Response> {
+    let utxos = payload.utxos;
+    let result = index.get_indexed_utxos(utxos);
+    match result {
+      Ok(data) => {
+        println!("data: {:?}", data);
+        Ok(serde_json::to_vec(&data).unwrap().into_response())
+      },
+      Err(err) => {
+        println!("err: {:?}", err);
+        Err(ServerError::Internal(err))
+      }
+    }
+  }
+  /// get inscription satpoint by inscription_id
+  async fn api_inscription_satpoint(Extension(index): Extension<Arc<Index>>, Path(inscription_id): Path<InscriptionId>) -> ServerResult<Response> {
+    let satpoint = index.get_inscription_satpoint_by_id(inscription_id).unwrap().unwrap();
+    Ok(serde_json::to_vec(&satpoint).unwrap().into_response())
+  }
+
   async fn api_inscription_id(Extension(index): Extension<Arc<Index>>, Path(inscription_id): Path<InscriptionId>) -> ServerResult<Response> {
     let entry = index.get_inscription_entry(inscription_id).unwrap().unwrap();
     let satpoint = index
       .get_inscription_satpoint_by_id(inscription_id)
       .unwrap()
       .unwrap();
-    
+
     let content_data = index.get_inscription_by_id(inscription_id).unwrap().unwrap();
     let output = index
       .get_transaction(satpoint.outpoint.txid)?
@@ -447,7 +482,7 @@ impl Server {
   }
 
   async fn api_inscription_content_type(Extension(index): Extension<Arc<Index>>, Path(inscription_id): Path<InscriptionId>) -> ServerResult<Response> {
-    
+
     let satpoint = index
       .get_inscription_satpoint_by_id(inscription_id)
       .unwrap()
@@ -516,7 +551,7 @@ impl Server {
       .get_inscription_id_by_inscription_number(number)
       .unwrap();
     let inscription_id = output.unwrap();
-    
+
     info!("number: {}, id: {}", number, inscription_id.to_string());
     let entry = index.get_inscription_entry(inscription_id).unwrap().unwrap();
     let satpoint = index

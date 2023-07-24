@@ -332,6 +332,21 @@ impl Index {
     Ok(utxos)
   }
 
+  // Returns the utxos that in the index table outpoint_to_value
+  pub(crate) fn get_indexed_utxos(&self, utxos: BTreeMap<OutPoint, u64>) -> Result<BTreeMap<OutPoint, u64>> {
+    let utxos = utxos.clone();
+    let rtx = self.database.begin_read()?;
+    let outpoint_to_value = rtx.open_table(OUTPOINT_TO_VALUE)?;
+    for outpoint in utxos.keys() {
+      if outpoint_to_value.get(&outpoint.store())?.is_none() {
+        return Err(anyhow!(
+          "output in Bitcoin Core wallet but not in ord index: {outpoint}"
+        ));
+      }
+    }
+    Ok(utxos)
+  }
+
   pub(crate) fn get_unspent_output_ranges(
     &self,
     wallet: Wallet,
@@ -805,7 +820,7 @@ impl Index {
 
   pub(crate) fn list(&self, outpoint: OutPoint) -> Result<Option<List>> {
     self.require_sat_index("list")?;
-    
+
     let array = outpoint.store();
 
     let sat_ranges = self.list_inner(array)?;

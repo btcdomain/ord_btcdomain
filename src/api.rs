@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+use bitcoin::OutPoint;
 use serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -41,4 +43,9 @@ pub struct InscriptionFirstOwner {
 pub struct InscriptionContentType {
     pub content_type: String,
     pub address: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, PartialOrd)]
+pub struct UtxoPayload {
+    pub(crate) utxos: BTreeMap<OutPoint, u64>,
 }
