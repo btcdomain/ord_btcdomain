@@ -204,7 +204,7 @@ impl Inscribe {
 
     let reveal_script = inscription.append_reveal_script(
       ScriptBuf::builder()
-        .push_slice(&public_key.serialize())
+        .push_slice(public_key.serialize())
         .push_opcode(opcodes::all::OP_CHECKSIG),
     );
 
@@ -385,6 +385,7 @@ impl Inscribe {
 #[cfg(test)]
 mod tests {
   use super::*;
+
 
   #[test]
   fn reveal_transaction_pays_fee() {
@@ -695,4 +696,5 @@ mod tests {
 
     assert!(reveal_tx.size() >= MAX_STANDARD_TX_WEIGHT as usize);
   }
+
 }

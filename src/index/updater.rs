@@ -266,11 +266,11 @@ impl Updater {
 
     // Batch 2048 missing inputs at a time. Arbitrarily chosen for now, maybe higher or lower can be faster?
     // Did rudimentary benchmarks with 1024 and 4096 and time was roughly the same.
-    const BATCH_SIZE: usize = 2048;
+    const BATCH_SIZE: usize = 1024;
     // Default rpcworkqueue in bitcoind is 16, meaning more than 16 concurrent requests will be rejected.
     // Since we are already requesting blocks on a separate thread, and we don't want to break if anything
     // else runs a request, we keep this to 12.
-    const PARALLEL_REQUESTS: usize = 12;
+    const PARALLEL_REQUESTS: usize = 6;
 
     std::thread::spawn(move || {
       let rt = tokio::runtime::Builder::new_multi_thread()
@@ -446,7 +446,7 @@ impl Updater {
         coinbase_inputs.push_front((start.n(), (start + h.subsidy()).n()));
         self.sat_ranges_since_flush += 1;
       }
-
+      //循环这个块的消息， 跳过第一条，第一条为矿工奖励
       for (tx_offset, (tx, txid)) in block.txdata.iter().enumerate().skip(1) {
         log::trace!("Indexing transaction {tx_offset}…");
 

@@ -41,17 +41,27 @@ macro_rules! define_multimap_table {
       MultimapTableDefinition::new(stringify!($name));
   };
 }
-
+//高度对应blockhash
 define_table! { HEIGHT_TO_BLOCK_HASH, u64, &BlockHashValue }
+//inscription 对应的 基础信息 如高度,number,fee,sat
 define_table! { INSCRIPTION_ID_TO_INSCRIPTION_ENTRY, &InscriptionIdValue, InscriptionEntryValue }
+//inscription对应的satpoint 例: tx_id:index:offset
 define_table! { INSCRIPTION_ID_TO_SATPOINT, &InscriptionIdValue, &SatPointValue }
+//inscription number 对应 inscription id
 define_table! { INSCRIPTION_NUMBER_TO_INSCRIPTION_ID, i64, &InscriptionIdValue }
+// tx_id:index 对应的 sat ranges 
 define_table! { OUTPOINT_TO_SAT_RANGES, &OutPointValue, &[u8] }
+// tx_id:index
 define_table! { OUTPOINT_TO_VALUE, &OutPointValue, u64}
+// inscription 对应的 number
 define_table! { REINSCRIPTION_ID_TO_SEQUENCE_NUMBER, &InscriptionIdValue, u64 }
+// tx_id:index:offset 对应inscription
 define_multimap_table! { SATPOINT_TO_INSCRIPTION_ID, &SatPointValue, &InscriptionIdValue }
+// sat值 对应inscription
 define_multimap_table! { SAT_TO_INSCRIPTION_ID, u64, &InscriptionIdValue }
+//sat 对应 tx_id:index:offset
 define_table! { SAT_TO_SATPOINT, u64, &SatPointValue }
+//总条数
 define_table! { STATISTIC_TO_COUNT, u64, u64 }
 define_table! { WRITE_TRANSACTION_STARTING_BLOCK_COUNT_TO_TIMESTAMP, u64, u128 }
 

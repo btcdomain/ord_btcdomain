@@ -71,6 +71,17 @@ struct Search {
   query: String,
 }
 
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct Output {
+  pub output: OutPoint,
+  pub start: u64,
+  pub end: u64,
+  pub size: u64,
+  pub offset: u64,
+  pub rarity: Rarity,
+  pub name: String,
+}
+
 #[derive(RustEmbed)]
 #[folder = "static"]
 struct StaticAssets;
@@ -189,6 +200,7 @@ impl Server {
         .route("/api/first_owner/:inscription_id", get(Self::api_first_owner))
         .route("/api/inscription_satpoint/:inscription_id", get(Self::api_inscription_satpoint))
         .route("/api/indexed_utxos/:utxos", get(Self::api_indexed_utxos))
+        .route("/api/output/:output", get(Self::get_sat_range_by_utxo))
         .route("/api/inscriptions", get(Self::api_inscriptions))
         .layer(Extension(index))
         .layer(Extension(page_config))
@@ -425,6 +437,35 @@ impl Server {
       }
     }
   }
+  //根据utxo获取sat
+  async fn get_sat_range_by_utxo(Extension(index): Extension<Arc<Index>>, Path(outpoint): Path<OutPoint>) -> ServerResult<Response> {
+    let list_utxo = |outpoint: OutPoint, ranges: Vec<(u64, u64)>| -> Vec<Output> {
+        let mut offset = 0;
+        ranges.into_iter().map(|(start, end)| {
+            let size = end - start;
+            let output = Output {
+                output: outpoint,
+                start,
+                end,
+                size,
+                offset,
+                name: Sat(start).name(),
+                rarity: Sat(start).rarity(),
+            };
+            offset += size;
+            output
+        }).collect()
+    };
+    match index.list(outpoint)? {
+        Some(crate::index::List::Unspent(ranges)) => {
+            let outputs = list_utxo(outpoint, ranges);
+
+            Ok(serde_json::to_vec(&outputs).unwrap().into_response())
+        }
+        Some(crate::index::List::Spent) => Err(ServerError::BadRequest("output spent.".to_string())),
+        None => Err(ServerError::NotFound("output not found".to_string())),
+    }
+}
   /// get indexed utxos
   async fn api_indexed_utxos(Extension(index): Extension<Arc<Index>>, Json(payload):Json<UtxoPayload>) -> ServerResult<Response> {
     let utxos = payload.utxos;

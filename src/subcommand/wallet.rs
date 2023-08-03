@@ -71,6 +71,7 @@ impl Wallet {
       Self::Transactions(transactions) => transactions.run(options),
       Self::Outputs => outputs::run(options),
       Self::Cardinals => cardinals::run(options),
+      
     }
   }
 }
